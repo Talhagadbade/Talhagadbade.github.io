@@ -1,0 +1,43 @@
+name: Deploy Pages
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject meta tags
+        env:
+          GHPI_GM: ${{ secrets.GHPI_GOOGLE_META }}
+          GHPI_BM: ${{ secrets.GHPI_BING_META }}
+        run: |
+          python3 -c "
+          import os, pathlib
+          gm = os.environ.get('GHPI_GM', '')
+          bm = os.environ.get('GHPI_BM', '')
+          for p in pathlib.Path('.').rglob('*.html'):
+              try:
+                  s = p.read_text(encoding='utf-8')
+                  s2 = s.replace('<!-- 0c15adb74d180a1d7aea29ecf6ef6e2c -->', gm)
+                  s2 = s2.replace('<!-- b3c93444ec6097b0994ecc763d568d37 -->', bm)
+                  if s2 != s: p.write_text(s2, encoding='utf-8')
+              except Exception: pass
+          "
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
